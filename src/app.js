@@ -18,7 +18,7 @@ app.use(cors({
 app.use(express.json())
 
 // Ensure MongoDB is connected before each request (serverless-safe)
-if ((process.env.DB_TYPE || 'sqlite') === 'mongodb') {
+if ((process.env.DB_TYPE || 'sqlite').trim() === 'mongodb') {
   const { connectMongo } = require('../db/mongo')
   app.use(async (req, res, next) => {
     try {
