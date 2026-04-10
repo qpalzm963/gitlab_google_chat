@@ -10,6 +10,9 @@ const chatCallbackRouter = require('./routes/chatCallback')
 
 const app = express()
 
+// Vercel / reverse proxy 環境需要信任 X-Forwarded-For（rate-limit 才能正確識別 IP）
+app.set('trust proxy', 1)
+
 app.use(helmet())
 app.use(cors({
   origin: (process.env.FRONTEND_URL || 'http://localhost:5173').trim(),
