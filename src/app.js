@@ -1,0 +1,50 @@
+const express = require('express')
+const cors = require('cors')
+const helmet = require('helmet')
+const rateLimit = require('express-rate-limit')
+
+// Connect to MongoDB if DB_TYPE is mongodb
+if ((process.env.DB_TYPE || 'sqlite') === 'mongodb') {
+  const { connectMongo } = require('../db/mongo')
+  connectMongo().catch(err => {
+    console.error('MongoDB connection failed:', err.message)
+    process.exit(1)
+  })
+}
+
+const authRouter = require('./routes/auth')
+const departmentsRouter = require('./routes/departments')
+const webhookRouter = require('./routes/webhook')
+const chatCallbackRouter = require('./routes/chatCallback')
+
+const app = express()
+
+app.use(helmet())
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  credentials: true
+}))
+app.use(express.json())
+
+// Webhook 端點獨立 rate limit（每 IP 每分鐘最多 60 次）
+const webhookLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests' }
+})
+
+app.use('/webhook', webhookLimiter, webhookRouter)
+app.use('/chat-callback', chatCallbackRouter)
+app.use('/auth', authRouter)
+app.use('/api/departments', departmentsRouter)
+
+app.get('/', (req, res) => res.json({ status: 'ok' }))
+
+app.use((err, req, res, next) => {
+  console.error(err.stack)
+  res.status(500).json({ error: 'Internal server error' })
+})
+
+module.exports = app
