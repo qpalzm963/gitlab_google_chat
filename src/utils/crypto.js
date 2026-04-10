@@ -1,7 +1,7 @@
 const crypto = require('crypto')
 
 function getKey() {
-  const hex = process.env.ENCRYPTION_KEY
+  const hex = (process.env.ENCRYPTION_KEY || '').trim()
   if (!hex || hex.length !== 64) {
     throw new Error('ENCRYPTION_KEY must be a 64-char hex string (32 bytes)')
   }
