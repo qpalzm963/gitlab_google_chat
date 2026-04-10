@@ -3,12 +3,17 @@ const cors = require('cors')
 const helmet = require('helmet')
 const rateLimit = require('express-rate-limit')
 
-// Connect to MongoDB if DB_TYPE is mongodb
+// Ensure MongoDB is connected before each request (serverless-safe)
 if ((process.env.DB_TYPE || 'sqlite') === 'mongodb') {
   const { connectMongo } = require('../db/mongo')
-  connectMongo().catch(err => {
-    console.error('MongoDB connection failed:', err.message)
-    process.exit(1)
+  app.use(async (req, res, next) => {
+    try {
+      await connectMongo()
+      next()
+    } catch (err) {
+      console.error('MongoDB connection failed:', err.message)
+      res.status(503).json({ error: 'Database unavailable' })
+    }
   })
 }
 

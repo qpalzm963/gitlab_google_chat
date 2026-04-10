@@ -35,7 +35,7 @@ router.post('/', async (req, res) => {
   }
 
   // 3. 查詢部門設定（取 GitLab token + base URL）
-  const dept = repo.dept.findById(deptId, { decrypt: true })
+  const dept = await repo.dept.findById(deptId, { decrypt: true })
   if (!dept) return res.status(404).json({ text: '找不到部門設定' })
 
   // 4. 確認按鈕權限
