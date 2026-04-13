@@ -46,8 +46,24 @@ export default function Dashboard() {
         <a onClick={() => navigate(`/dept/${r.id}`)} style={{ fontWeight: 500 }}>{name}</a>
       )
     },
+    {
+      title: '平台',
+      dataIndex: 'platform',
+      key: 'platform',
+      width: 90,
+      render: v => <Tag>{(v || 'gitlab').toUpperCase()}</Tag>
+    },
     { title: 'Slug', dataIndex: 'slug', key: 'slug', render: s => <code>{s}</code> },
-    { title: 'GitLab URL', dataIndex: 'gitlab_base_url', key: 'gitlab_base_url', ellipsis: true },
+    {
+      title: '來源',
+      key: 'source',
+      ellipsis: true,
+      render: (_, r) => {
+        const platform = r.platform || 'gitlab'
+        if (platform === 'github') return <code>{`${r.github_owner || ''}/${r.github_repo || ''}`}</code>
+        return r.gitlab_base_url || '—'
+      }
+    },
     {
       title: '狀態',
       dataIndex: 'is_active',

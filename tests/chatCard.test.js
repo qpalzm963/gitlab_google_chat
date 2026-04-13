@@ -11,6 +11,22 @@ const baseMrPayload = {
   user: { name: 'Alice' }
 }
 
+const basePrPayload = {
+  action: 'opened',
+  pull_request: {
+    number: 7,
+    title: 'Fix bug',
+    user: { login: 'alice' },
+    head: { ref: 'fix' },
+    base: { ref: 'main' }
+  },
+  repository: {
+    name: 'hello-world',
+    full_name: 'octocat/hello-world',
+    owner: { login: 'octocat' }
+  }
+}
+
 describe('chatCard', () => {
   test('produces cardsV2 structure', () => {
     const card = buildCard(baseDept, baseMrPayload)
@@ -43,5 +59,17 @@ describe('chatCard', () => {
     const dept = { ...baseDept, lang: 'en' }
     const card = buildCard(dept, baseMrPayload)
     expect(card.cardsV2[0].card.header.subtitle).toBe('New MR')
+  })
+
+  test('GitHub PR payload produces PR card and parameters', () => {
+    const dept = { ...baseDept, platform: 'github' }
+    const card = buildCard(dept, basePrPayload)
+    expect(card.cardsV2[0].card.header.title).toContain('#7')
+    const buttons = card.cardsV2[0].card.sections.find(s => s.widgets?.[0]?.buttonList)?.widgets[0].buttonList.buttons
+    const mergeBtn = buttons.find(b => b.onClick.action.function === 'merge_mr')
+    const params = mergeBtn.onClick.action.parameters.reduce((acc, p) => ({ ...acc, [p.key]: p.value }), {})
+    expect(params.owner).toBe('octocat')
+    expect(params.repo).toBe('hello-world')
+    expect(params.pr_number).toBe('7')
   })
 })

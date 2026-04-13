@@ -2,7 +2,9 @@ const db = require('../../../db/sqlite')
 const { v4: uuidv4 } = require('uuid')
 const { encrypt, decrypt } = require('../../utils/crypto')
 
-const SENSITIVE_FIELDS = ['gitlab_token', 'webhook_secret', 'chat_webhook_url']
+const SENSITIVE_FIELDS = ['gitlab_token', 'github_token', 'webhook_secret', 'chat_webhook_url']
+const PLATFORM_GITLAB = 'gitlab'
+const PLATFORM_GITHUB = 'github'
 
 function encryptFields(data) {
   const result = { ...data }
@@ -14,6 +16,7 @@ function encryptFields(data) {
       delete result[field]
     }
   }
+  // Backward-compatible alias: allow github_token to reuse gitlab_token from UI if needed later
   return result
 }
 
@@ -52,6 +55,11 @@ function parseBooleans(row) {
 }
 
 function computeIsActive(row) {
+  const platform = row.platform || PLATFORM_GITLAB
+  if (platform === PLATFORM_GITHUB) {
+    return (row.github_token_enc && row.webhook_secret_enc &&
+      row.chat_webhook_url_enc && row.github_owner && row.github_repo) ? 1 : 0
+  }
   return (row.gitlab_token_enc && row.webhook_secret_enc &&
     row.chat_webhook_url_enc && row.gitlab_base_url) ? 1 : 0
 }
@@ -78,16 +86,20 @@ function create(data) {
 
   db.prepare(`
     INSERT INTO departments (
-      id, name, gitlab_base_url, gitlab_project_id,
-      gitlab_token_enc, webhook_secret_enc, chat_webhook_url_enc,
+      id, name, platform,
+      gitlab_base_url, gitlab_project_id, gitlab_token_enc,
+      github_owner, github_repo, github_token_enc,
+      webhook_secret_enc, chat_webhook_url_enc,
       space_name, lang,
       ev_mr_opened, ev_mr_updated, ev_mr_merged,
       ev_allow_merge_btn, ev_allow_approve_btn, ev_allow_close_btn,
       notify_cooldown_seconds, is_active
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
-    id, enc.name, enc.gitlab_base_url, enc.gitlab_project_id || null,
-    enc.gitlab_token_enc, enc.webhook_secret_enc, enc.chat_webhook_url_enc,
+    id, enc.name, enc.platform || PLATFORM_GITLAB,
+    enc.gitlab_base_url || null, enc.gitlab_project_id || null, enc.gitlab_token_enc || null,
+    enc.github_owner || null, enc.github_repo || null, enc.github_token_enc || null,
+    enc.webhook_secret_enc, enc.chat_webhook_url_enc,
     enc.space_name || null, enc.lang || 'zh-TW',
     toInt(enc.ev_mr_opened) ?? 1,
     toInt(enc.ev_mr_updated) ?? 0,
@@ -116,8 +128,10 @@ function update(id, data) {
     'ev_allow_merge_btn', 'ev_allow_approve_btn', 'ev_allow_close_btn'
   ])
   const allowed = [
-    'name', 'gitlab_base_url', 'gitlab_project_id',
-    'gitlab_token_enc', 'webhook_secret_enc', 'chat_webhook_url_enc',
+    'name', 'platform',
+    'gitlab_base_url', 'gitlab_project_id', 'gitlab_token_enc',
+    'github_owner', 'github_repo', 'github_token_enc',
+    'webhook_secret_enc', 'chat_webhook_url_enc',
     'space_name', 'lang',
     'ev_mr_opened', 'ev_mr_updated', 'ev_mr_merged',
     'ev_allow_merge_btn', 'ev_allow_approve_btn', 'ev_allow_close_btn',

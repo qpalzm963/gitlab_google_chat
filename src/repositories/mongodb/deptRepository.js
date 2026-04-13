@@ -2,15 +2,21 @@ const mongoose = require('mongoose')
 const { v4: uuidv4 } = require('uuid')
 const { encrypt, decrypt } = require('../../utils/crypto')
 
-const SENSITIVE_FIELDS = ['gitlab_token', 'webhook_secret', 'chat_webhook_url']
+const SENSITIVE_FIELDS = ['gitlab_token', 'github_token', 'webhook_secret', 'chat_webhook_url']
+const PLATFORM_GITLAB = 'gitlab'
+const PLATFORM_GITHUB = 'github'
 
 // ── Schema ──────────────────────────────────────────────────────────────────
 const schema = new mongoose.Schema({
   _id:                   { type: String },
   name:                  { type: String, required: true },
-  gitlab_base_url:       { type: String, required: true },
+  platform:              { type: String, default: PLATFORM_GITLAB },
+  gitlab_base_url:       { type: String, default: null },
   gitlab_project_id:     { type: String, default: null },
-  gitlab_token_enc:      { type: String, required: true },
+  gitlab_token_enc:      { type: String, default: null },
+  github_owner:          { type: String, default: null },
+  github_repo:           { type: String, default: null },
+  github_token_enc:      { type: String, default: null },
   webhook_secret_enc:    { type: String, required: true },
   chat_webhook_url_enc:  { type: String, required: true },
   space_name:            { type: String, default: null },
@@ -56,6 +62,11 @@ function encryptFields(data) {
 }
 
 function computeIsActive(row) {
+  const platform = row.platform || PLATFORM_GITLAB
+  if (platform === PLATFORM_GITHUB) {
+    return !!(row.github_token_enc && row.webhook_secret_enc &&
+      row.chat_webhook_url_enc && row.github_owner && row.github_repo)
+  }
   return !!(row.gitlab_token_enc && row.webhook_secret_enc &&
     row.chat_webhook_url_enc && row.gitlab_base_url)
 }
@@ -100,9 +111,13 @@ async function create(data) {
   const doc = new Dept({
     _id: id,
     name: enc.name,
-    gitlab_base_url: enc.gitlab_base_url,
+    platform: enc.platform || PLATFORM_GITLAB,
+    gitlab_base_url: enc.gitlab_base_url || null,
     gitlab_project_id: enc.gitlab_project_id || null,
-    gitlab_token_enc: enc.gitlab_token_enc,
+    gitlab_token_enc: enc.gitlab_token_enc || null,
+    github_owner: enc.github_owner || null,
+    github_repo: enc.github_repo || null,
+    github_token_enc: enc.github_token_enc || null,
     webhook_secret_enc: enc.webhook_secret_enc,
     chat_webhook_url_enc: enc.chat_webhook_url_enc,
     space_name: enc.space_name || null,
@@ -137,8 +152,10 @@ async function update(id, data) {
 
   const enc = encryptFields(data)
   const allowed = [
-    'name', 'gitlab_base_url', 'gitlab_project_id',
-    'gitlab_token_enc', 'webhook_secret_enc', 'chat_webhook_url_enc',
+    'name', 'platform',
+    'gitlab_base_url', 'gitlab_project_id', 'gitlab_token_enc',
+    'github_owner', 'github_repo', 'github_token_enc',
+    'webhook_secret_enc', 'chat_webhook_url_enc',
     'space_name', 'lang',
     'ev_mr_opened', 'ev_mr_updated', 'ev_mr_merged',
     'ev_allow_merge_btn', 'ev_allow_approve_btn', 'ev_allow_close_btn',

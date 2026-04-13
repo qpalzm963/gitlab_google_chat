@@ -16,9 +16,23 @@ router.get('/', async (req, res) => {
 
 // POST /api/departments
 router.post('/', requireRole('admin', 'editor'), async (req, res) => {
-  const { name, gitlab_base_url, gitlab_token, webhook_secret, chat_webhook_url } = req.body
-  if (!name || !gitlab_base_url || !gitlab_token || !webhook_secret || !chat_webhook_url) {
-    return res.status(400).json({ error: 'Missing required fields: name, gitlab_base_url, gitlab_token, webhook_secret, chat_webhook_url' })
+  const platform = req.body?.platform || 'gitlab'
+  const { name, webhook_secret, chat_webhook_url } = req.body
+
+  if (!name || !webhook_secret || !chat_webhook_url) {
+    return res.status(400).json({ error: 'Missing required fields: name, webhook_secret, chat_webhook_url' })
+  }
+
+  if (platform === 'github') {
+    const { github_owner, github_repo, github_token } = req.body
+    if (!github_owner || !github_repo || !github_token) {
+      return res.status(400).json({ error: 'Missing required fields for GitHub: github_owner, github_repo, github_token' })
+    }
+  } else {
+    const { gitlab_base_url, gitlab_token } = req.body
+    if (!gitlab_base_url || !gitlab_token) {
+      return res.status(400).json({ error: 'Missing required fields for GitLab: gitlab_base_url, gitlab_token' })
+    }
   }
   try {
     const dept = await repo.dept.create(req.body)

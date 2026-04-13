@@ -3,6 +3,8 @@ const cors = require('cors')
 const helmet = require('helmet')
 const rateLimit = require('express-rate-limit')
 
+const app = express()
+
 // Ensure MongoDB is connected before each request (serverless-safe)
 if ((process.env.DB_TYPE || 'sqlite') === 'mongodb') {
   const { connectMongo } = require('../db/mongo')
@@ -22,14 +24,17 @@ const departmentsRouter = require('./routes/departments')
 const webhookRouter = require('./routes/webhook')
 const chatCallbackRouter = require('./routes/chatCallback')
 
-const app = express()
-
 app.use(helmet())
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true
 }))
-app.use(express.json())
+app.use(express.json({
+  verify: (req, res, buf) => {
+    // Required for verifying GitHub webhook signatures (HMAC is over raw bytes)
+    req.rawBody = buf
+  }
+}))
 
 // Webhook 端點獨立 rate limit（每 IP 每分鐘最多 60 次）
 const webhookLimiter = rateLimit({
