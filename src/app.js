@@ -3,22 +3,10 @@ const cors = require('cors')
 const helmet = require('helmet')
 const rateLimit = require('express-rate-limit')
 
-const authRouter = require('./routes/auth')
-const departmentsRouter = require('./routes/departments')
-const webhookRouter = require('./routes/webhook')
-const chatCallbackRouter = require('./routes/chatCallback')
-
 const app = express()
 
 // Vercel / reverse proxy 環境需要信任 X-Forwarded-For（rate-limit 才能正確識別 IP）
 app.set('trust proxy', 1)
-
-app.use(helmet())
-app.use(cors({
-  origin: (process.env.FRONTEND_URL || 'http://localhost:5173').trim(),
-  credentials: true
-}))
-app.use(express.json())
 
 // Ensure MongoDB is connected before each request (serverless-safe)
 if ((process.env.DB_TYPE || 'sqlite').trim() === 'mongodb') {
@@ -33,6 +21,23 @@ if ((process.env.DB_TYPE || 'sqlite').trim() === 'mongodb') {
     }
   })
 }
+
+const authRouter = require('./routes/auth')
+const departmentsRouter = require('./routes/departments')
+const webhookRouter = require('./routes/webhook')
+const chatCallbackRouter = require('./routes/chatCallback')
+
+app.use(helmet())
+app.use(cors({
+  origin: (process.env.FRONTEND_URL || 'http://localhost:5173').trim(),
+  credentials: true
+}))
+app.use(express.json({
+  verify: (req, res, buf) => {
+    // Required for verifying GitHub webhook signatures (HMAC is over raw bytes)
+    req.rawBody = buf
+  }
+}))
 
 // Webhook 端點獨立 rate limit（每 IP 每分鐘最多 60 次）
 const webhookLimiter = rateLimit({

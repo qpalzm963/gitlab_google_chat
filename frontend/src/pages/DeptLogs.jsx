@@ -52,11 +52,15 @@ export default function DeptLogs() {
       )
     },
     {
-      title: 'MR #',
+      title: 'MR/PR #',
       dataIndex: 'gitlab_mr_iid',
       key: 'gitlab_mr_iid',
       width: 80,
-      render: v => v ? `!${v}` : '—'
+      render: (v, r) => {
+        if (!v) return '—'
+        const prefix = r.event_type === 'pull_request' ? '#' : '!'
+        return `${prefix}${v}`
+      }
     },
     {
       title: '狀態',

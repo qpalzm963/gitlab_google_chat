@@ -61,6 +61,7 @@ export default function DeptSettings() {
   const [newDeptOpen, setNewDeptOpen] = useState(false)
   const isAdmin = user?.role === 'admin'
   const canEdit = ['admin', 'editor'].includes(user?.role)
+  const platform = Form.useWatch('platform', form) || dept?.platform || 'gitlab'
 
   const loadData = () =>
     Promise.all([getDepartment(id), getDepartments()])
@@ -69,7 +70,9 @@ export default function DeptSettings() {
         setDepts(deptsData)
         form.setFieldsValue({
           ...deptData,
+          platform: deptData.platform || 'gitlab',
           gitlab_token: '',
+          github_token: '',
           webhook_secret: '',
           chat_webhook_url: '',
         })
@@ -84,6 +87,16 @@ export default function DeptSettings() {
     const payload = Object.fromEntries(
       Object.entries(values).filter(([, v]) => v !== '' && v !== undefined)
     )
+    // Avoid accidental overwrite of unrelated platform fields
+    if (payload.platform === 'github') {
+      delete payload.gitlab_base_url
+      delete payload.gitlab_project_id
+      delete payload.gitlab_token
+    } else {
+      delete payload.github_owner
+      delete payload.github_repo
+      delete payload.github_token
+    }
     try {
       await updateDepartment(id, payload)
       message.success('設定已儲存')
@@ -232,7 +245,9 @@ export default function DeptSettings() {
             {/* Webhook URL info */}
             <Card size="small" style={{ marginBottom: 16, borderColor: '#91caff', background: '#e6f4ff' }}>
               <Text type="secondary" style={{ display: 'block', marginBottom: 8, fontSize: 13 }}>
-                將以下網址填入 GitLab → Settings → Webhooks，並填入相同的 Webhook Secret：
+                {platform === 'github'
+                  ? '將以下網址填入 GitHub Repo → Settings → Webhooks，並填入相同的 Webhook Secret：'
+                  : '將以下網址填入 GitLab → Settings → Webhooks，並填入相同的 Webhook Secret：'}
               </Text>
               <Input
                 readOnly
@@ -248,31 +263,68 @@ export default function DeptSettings() {
                 }
               />
               <Text type="secondary" style={{ display: 'block', marginTop: 6, fontSize: 12 }}>
-                Trigger 勾選：<b>Merge request events</b>
+                {platform === 'github'
+                  ? <>勾選事件：<b>Pull requests</b></>
+                  : <>Trigger 勾選：<b>Merge request events</b></>}
               </Text>
             </Card>
 
             {/* GitLab settings */}
-            <Card size="small" title={<SectionLabel>GitLab 設定</SectionLabel>} style={{ marginBottom: 12 }}>
-              <Form.Item label="GitLab 網址" name="gitlab_base_url" rules={[{ type: 'url' }]} style={{ marginBottom: 12 }}>
-                <Input placeholder="https://gitlab.company.com" />
-              </Form.Item>
+            <Card size="small" title={<SectionLabel>平台設定</SectionLabel>} style={{ marginBottom: 12 }}>
               <Row gutter={12}>
                 <Col span={12}>
-                  <Form.Item label="Project ID" name="gitlab_project_id" style={{ marginBottom: 12 }}>
-                    <Input placeholder="123" />
+                  <Form.Item label="平台" name="platform" style={{ marginBottom: 12 }}>
+                    <Select options={[{ value: 'gitlab', label: 'GitLab' }, { value: 'github', label: 'GitHub' }]} />
                   </Form.Item>
                 </Col>
-                <Col span={12}>
+              </Row>
+
+              {platform === 'gitlab' ? (
+                <>
+                  <Form.Item label="GitLab 網址" name="gitlab_base_url" rules={[{ type: 'url' }]} style={{ marginBottom: 12 }}>
+                    <Input placeholder="https://gitlab.company.com" />
+                  </Form.Item>
+                  <Row gutter={12}>
+                    <Col span={12}>
+                      <Form.Item label="Project ID" name="gitlab_project_id" style={{ marginBottom: 12 }}>
+                        <Input placeholder="123" />
+                      </Form.Item>
+                    </Col>
+                    <Col span={12}>
+                      <Form.Item
+                        label={<SecretLabel label="API Token" set={!!dept?.gitlab_token_enc} />}
+                        name="gitlab_token"
+                        style={{ marginBottom: 12 }}
+                      >
+                        <Input.Password placeholder="留空不更新" />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                </>
+              ) : (
+                <>
+                  <Row gutter={12}>
+                    <Col span={12}>
+                      <Form.Item label="GitHub Owner" name="github_owner" style={{ marginBottom: 12 }}>
+                        <Input placeholder="octocat" />
+                      </Form.Item>
+                    </Col>
+                    <Col span={12}>
+                      <Form.Item label="GitHub Repo" name="github_repo" style={{ marginBottom: 12 }}>
+                        <Input placeholder="hello-world" />
+                      </Form.Item>
+                    </Col>
+                  </Row>
                   <Form.Item
-                    label={<SecretLabel label="API Token" set={!!dept?.gitlab_token_enc} />}
-                    name="gitlab_token"
+                    label={<SecretLabel label="GitHub Token" set={!!dept?.github_token_enc} />}
+                    name="github_token"
                     style={{ marginBottom: 12 }}
                   >
                     <Input.Password placeholder="留空不更新" />
                   </Form.Item>
-                </Col>
-              </Row>
+                </>
+              )}
+
               <Form.Item
                 label={<SecretLabel label="Webhook Secret" set={!!dept?.webhook_secret_enc} />}
                 name="webhook_secret"

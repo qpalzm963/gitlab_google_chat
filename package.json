@@ -9,6 +9,7 @@
     "db:init": "node db/init.js",
     "db:seed": "node db/seed.js",
     "db:migrate": "node scripts/migrate-sqlite-to-mongo.js",
+    "db:migrate:schema": "node scripts/migrate-sqlite-schema-v2.js",
     "test": "jest --runInBand"
   },
   "dependencies": {
