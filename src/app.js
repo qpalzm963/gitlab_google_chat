@@ -2,6 +2,7 @@ const express = require('express')
 const cors = require('cors')
 const helmet = require('helmet')
 const rateLimit = require('express-rate-limit')
+const path = require('path')
 
 const app = express()
 
@@ -53,7 +54,13 @@ app.use('/chat-callback', chatCallbackRouter)
 app.use('/auth', authRouter)
 app.use('/api/departments', departmentsRouter)
 
-app.get('/', (req, res) => res.json({ status: 'ok' }))
+// Serve React frontend (built by Vite)
+const distDir = path.join(__dirname, '../frontend/dist')
+app.use(express.static(distDir))
+// SPA fallback — return index.html for any non-API route
+app.get('*', (req, res) => {
+  res.sendFile(path.join(distDir, 'index.html'))
+})
 
 app.use((err, req, res, next) => {
   console.error(err.stack)
