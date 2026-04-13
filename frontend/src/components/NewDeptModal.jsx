@@ -11,10 +11,10 @@ export default function NewDeptModal({ open, onClose, onCreated }) {
   const onFinish = async values => {
     setLoading(true)
     try {
-      await createDepartment(values)
+      const result = await createDepartment(values)
       message.success('部門已新增')
       form.resetFields()
-      onCreated?.()
+      onCreated?.(result)
       onClose()
     } catch (err) {
       message.error(err.response?.data?.error || '新增失敗')

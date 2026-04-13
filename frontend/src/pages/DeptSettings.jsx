@@ -35,6 +35,19 @@ function SectionLabel({ children }) {
   )
 }
 
+function SecretLabel({ label, set }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+      {label}
+      {set
+        ? <Tag color="green" style={{ margin: 0, fontSize: 11, padding: '0 5px', lineHeight: '18px' }}>已設定</Tag>
+        : <Tag color="warning" style={{ margin: 0, fontSize: 11, padding: '0 5px', lineHeight: '18px' }}>未設定</Tag>
+      }
+      <span style={{ color: '#bfbfbf', fontSize: 12 }}>（留空不更新）</span>
+    </span>
+  )
+}
+
 export default function DeptSettings() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -223,12 +236,12 @@ export default function DeptSettings() {
               </Text>
               <Input
                 readOnly
-                value={`${window.location.origin}/webhook?dept=${id}`}
+                value={`${import.meta.env.VITE_API_URL || window.location.origin}/webhook?dept=${id}`}
                 addonAfter={
                   <Button
                     size="small" type="link" icon={<CopyOutlined />} style={{ padding: 0 }}
                     onClick={() => {
-                      navigator.clipboard.writeText(`${window.location.origin}/webhook?dept=${id}`)
+                      navigator.clipboard.writeText(`${import.meta.env.VITE_API_URL || window.location.origin}/webhook?dept=${id}`)
                       message.success('已複製')
                     }}
                   >複製</Button>
@@ -251,14 +264,22 @@ export default function DeptSettings() {
                   </Form.Item>
                 </Col>
                 <Col span={12}>
-                  <Form.Item label="API Token（留空不更新）" name="gitlab_token" style={{ marginBottom: 12 }}>
-                    <Input.Password placeholder="glpat-xxxx（目前已設定）" />
+                  <Form.Item
+                    label={<SecretLabel label="API Token" set={!!dept?.gitlab_token_enc} />}
+                    name="gitlab_token"
+                    style={{ marginBottom: 12 }}
+                  >
+                    <Input.Password placeholder="留空不更新" />
                   </Form.Item>
                 </Col>
               </Row>
-              <Form.Item label="Webhook Secret（留空不更新）" name="webhook_secret" style={{ marginBottom: 0 }}>
+              <Form.Item
+                label={<SecretLabel label="Webhook Secret" set={!!dept?.webhook_secret_enc} />}
+                name="webhook_secret"
+                style={{ marginBottom: 0 }}
+              >
                 <Input.Password
-                  placeholder="（目前已設定）"
+                  placeholder="留空不更新"
                   addonAfter={
                     <Button size="small" type="link" style={{ padding: 0 }}
                       onClick={() => form.setFieldValue('webhook_secret', randomSecret())}>
@@ -271,8 +292,16 @@ export default function DeptSettings() {
 
             {/* Google Chat settings */}
             <Card size="small" title={<SectionLabel>Google Chat 設定</SectionLabel>} style={{ marginBottom: 12 }}>
-              <Form.Item label="Incoming Webhook URL（留空不更新）" name="chat_webhook_url" style={{ marginBottom: 12 }}>
-                <Input.Password placeholder="https://chat.googleapis.com/v1/spaces/...（目前已設定）" />
+              <Form.Item
+                label={<SecretLabel label="Incoming Webhook URL" set={!!dept?.chat_webhook_url_enc} />}
+                name="chat_webhook_url"
+                style={{ marginBottom: 12 }}
+              >
+                <Input
+                  type="password"
+                  placeholder="留空不更新"
+                  autoComplete="off"
+                />
               </Form.Item>
               <Row gutter={12}>
                 <Col span={12}>
