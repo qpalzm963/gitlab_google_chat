@@ -3,6 +3,7 @@ const crypto = require('crypto')
 const repo = require('../repositories')
 const { buildPayloadHash, sha256 } = require('../utils/hash')
 const { buildCard } = require('../utils/chatCard')
+const { sendCard } = require('../utils/chatSend')
 
 const router = express.Router()
 
@@ -30,6 +31,11 @@ router.post('/', async (req, res) => {
   }
 
   const platform = dept.platform || PLATFORM_GITLAB
+  const gitlabEvent = req.headers['x-gitlab-event']
+  const ghEvent = req.headers['x-github-event']
+  const action = req.body?.object_attributes?.action || req.body?.action || null
+  console.log('[webhook] dept=%s platform=%s gitlabEvent=%s ghEvent=%s action=%s',
+    deptId, platform, gitlabEvent || '-', ghEvent || '-', action || '-')
 
   if (platform === PLATFORM_GITHUB) {
     return handleGithubWebhook(req, res, dept)
@@ -45,6 +51,7 @@ async function handleGitlabWebhook(req, res, dept) {
 
   // 1. 僅處理 Merge Request Hook
   if (!GITLAB_SUPPORTED_EVENTS.has(gitlabEvent)) {
+    console.log('[webhook][gitlab] ignored event=%s', gitlabEvent || '(missing)')
     return res.status(200).json({ message: 'Event type not handled' })
   }
 
@@ -56,6 +63,7 @@ async function handleGitlabWebhook(req, res, dept) {
 
   // 3. 驗證 X-Gitlab-Token
   if (!receivedToken || !verifyConstantTime(receivedToken, dept.webhook_secret)) {
+    console.log('[webhook][gitlab] unauthorized: token mismatch')
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
@@ -67,15 +75,12 @@ async function handleGitlabWebhook(req, res, dept) {
   // 4. 去重
   const hash = buildPayloadHash(eventUUID || JSON.stringify(payload), dept.id)
   if (await repo.log.findByHash(hash)) {
-    await repo.log.create({
-      departmentId: dept.id, eventType, eventAction,
-      gitlabMrIid: mrIid, payloadHash: hash, status: 'duplicate'
-    })
     return res.status(200).json({ message: 'duplicate' })
   }
 
   // 5. 判斷觸發開關
   if (!shouldNotify(dept, eventAction)) {
+    console.log('[webhook][gitlab] filtered action=%s', eventAction || '(none)')
     return res.status(200).json({ message: 'Event filtered by settings' })
   }
 
@@ -86,7 +91,7 @@ async function handleGitlabWebhook(req, res, dept) {
   let status = 'sent'
 
   try {
-    const response = await sendWithRetry(dept.chat_webhook_url, card)
+    const response = await sendCard(dept.space_name, dept.chat_webhook_url, card)
     chatResponseCode = response.status
     if (!response.ok) {
       const body = await response.text()
@@ -104,6 +109,7 @@ async function handleGitlabWebhook(req, res, dept) {
     status, chatResponseCode, errorMessage
   })
 
+  if (status !== 'sent') console.log('[webhook][gitlab] send failed: %s', errorMessage || '(unknown)')
   return res.status(200).json({ message: status })
 }
 
@@ -114,16 +120,27 @@ async function handleGithubWebhook(req, res, dept) {
 
   // 1. 僅處理 pull_request events
   if (!GITHUB_SUPPORTED_EVENTS.has(ghEvent)) {
+    console.log('[webhook][github] ignored event=%s delivery=%s', ghEvent || '(missing)', delivery || '(missing)')
     return res.status(200).json({ message: 'Event type not handled' })
   }
 
   // 2. 驗證 signature（HMAC-SHA256 over raw bytes）
   const raw = req.rawBody || Buffer.from(JSON.stringify(req.body || {}), 'utf8')
   if (!verifyGithubSignature(raw, dept.webhook_secret, signature)) {
+    console.log('[webhook][github] unauthorized: signature mismatch delivery=%s', delivery || '(missing)')
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
-  const payload = req.body || {}
+  let payload = req.body || {}
+  // If GitHub sends `application/x-www-form-urlencoded`, the JSON payload is in `payload`.
+  if (payload && typeof payload.payload === 'string') {
+    try {
+      payload = JSON.parse(payload.payload)
+    } catch (err) {
+      console.log('[webhook][github] invalid form payload json: %s', err.message)
+      return res.status(400).json({ error: 'Invalid payload' })
+    }
+  }
   const repoFullName = payload?.repository?.full_name
   if (dept.github_owner && dept.github_repo && repoFullName) {
     const expected = `${dept.github_owner}/${dept.github_repo}`
@@ -142,15 +159,12 @@ async function handleGithubWebhook(req, res, dept) {
   const dedupeKey = delivery || sha256(raw.toString('utf8'))
   const hash = buildPayloadHash(dedupeKey, dept.id)
   if (await repo.log.findByHash(hash)) {
-    await repo.log.create({
-      departmentId: dept.id, eventType, eventAction,
-      gitlabMrIid: prNumber, payloadHash: hash, status: 'duplicate'
-    })
     return res.status(200).json({ message: 'duplicate' })
   }
 
   // 4. 判斷觸發開關
   if (!shouldNotify(dept, eventAction)) {
+    console.log('[webhook][github] filtered action=%s delivery=%s', eventAction || '(none)', delivery || '(missing)')
     return res.status(200).json({ message: 'Event filtered by settings' })
   }
 
@@ -161,7 +175,7 @@ async function handleGithubWebhook(req, res, dept) {
   let status = 'sent'
 
   try {
-    const response = await sendWithRetry(dept.chat_webhook_url, card)
+    const response = await sendCard(dept.space_name, dept.chat_webhook_url, card)
     chatResponseCode = response.status
     if (!response.ok) {
       const body = await response.text()
@@ -178,6 +192,7 @@ async function handleGithubWebhook(req, res, dept) {
     status, chatResponseCode, errorMessage
   })
 
+  if (status !== 'sent') console.log('[webhook][github] send failed: %s', errorMessage || '(unknown)')
   return res.status(200).json({ message: status })
 }
 
@@ -211,26 +226,6 @@ function shouldNotify(dept, action) {
   if (action === 'update' || action === 'updated') return dept.ev_mr_updated
   if (action === 'merge' || action === 'merged') return dept.ev_mr_merged
   return true
-}
-
-async function sendWithRetry(url, body, maxRetries = 3) {
-  let lastErr
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      })
-      return res
-    } catch (err) {
-      lastErr = err
-      if (i < maxRetries - 1) {
-        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, i)))
-      }
-    }
-  }
-  throw lastErr
 }
 
 module.exports = router

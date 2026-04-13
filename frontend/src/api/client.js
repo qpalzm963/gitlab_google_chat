@@ -1,7 +1,15 @@
 import axios from 'axios'
 
+function resolveBaseURL() {
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL
+  // When the frontend is served by the same origin as the API (e.g. Vercel rewrite),
+  // default to same-origin so production doesn't accidentally call localhost.
+  if (typeof window !== 'undefined' && window.location?.origin) return window.location.origin
+  return 'http://localhost:3000'
+}
+
 const client = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000'
+  baseURL: resolveBaseURL()
 })
 
 client.interceptors.request.use(config => {

@@ -357,8 +357,13 @@ export default function DeptSettings() {
               </Form.Item>
               <Row gutter={12}>
                 <Col span={12}>
-                  <Form.Item label="Space 顯示名稱" name="space_name" style={{ marginBottom: 0 }}>
-                    <Input placeholder="#backend-reviews" />
+                  <Form.Item
+                    label="Chat Space ID"
+                    name="space_name"
+                    style={{ marginBottom: 0 }}
+                    tooltip="填入後將透過 Chat API 發送（支援互動按鈕）。格式：spaces/XXXXXXXXX，可從 Chat Space URL 取得。"
+                  >
+                    <Input placeholder="spaces/XXXXXXXXX" />
                   </Form.Item>
                 </Col>
                 <Col span={12}>

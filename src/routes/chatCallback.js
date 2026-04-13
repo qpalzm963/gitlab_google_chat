@@ -23,6 +23,10 @@ router.post('/', async (req, res) => {
       })
     } catch (err) {
       console.error('[chat-callback] JWT verification failed:', err.message)
+      try {
+        const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
+        console.error('[chat-callback] JWT aud received:', payload.aud, '| expected:', process.env.CHAT_BOT_ENDPOINT)
+      } catch {}
       return res.status(403).json({ error: 'Invalid Google JWT' })
     }
 
@@ -94,7 +98,7 @@ router.post('/', async (req, res) => {
           body: JSON.stringify({ state: 'closed' })
         })
       } else {
-        return res.json({ text: `❌ 未知操作：${action}` })
+        return res.json({ text: '❌ 不支援的操作類型。' })
       }
 
       if (ghRes.status === 401 || ghRes.status === 403) {
@@ -109,7 +113,7 @@ router.post('/', async (req, res) => {
       if (!ghRes.ok) {
         const body = await ghRes.text()
         console.error('[chat-callback] GitHub error %d: %s', ghRes.status, body)
-        return res.json({ text: `❌ GitHub 錯誤 (${ghRes.status})：${body.slice(0, 200)}` })
+        return res.json({ text: `❌ GitHub 操作失敗 (HTTP ${ghRes.status})，請聯絡管理員確認設定。` })
       }
 
       const messages = {
@@ -145,7 +149,7 @@ router.post('/', async (req, res) => {
         body: JSON.stringify({ state_event: 'close' })
       })
     } else {
-      return res.json({ text: `❌ 未知操作：${action}` })
+      return res.json({ text: '❌ 不支援的操作類型。' })
     }
 
     if (gitlabRes.status === 401) {
@@ -157,7 +161,7 @@ router.post('/', async (req, res) => {
     if (!gitlabRes.ok) {
       const body = await gitlabRes.text()
       console.error('[chat-callback] GitLab error %d: %s', gitlabRes.status, body)
-      return res.json({ text: `❌ GitLab 錯誤 (${gitlabRes.status})：${body.slice(0, 200)}` })
+      return res.json({ text: `❌ GitLab 操作失敗 (HTTP ${gitlabRes.status})，請聯絡管理員確認設定。` })
     }
 
     const messages = {
@@ -169,7 +173,7 @@ router.post('/', async (req, res) => {
 
   } catch (err) {
     console.error('[chat-callback] Unhandled error:', err)
-    return res.json({ text: `❌ 伺服器內部錯誤：${err.message}` })
+    return res.json({ text: '❌ 伺服器內部錯誤，請聯絡管理員。' })
   }
 })
 
