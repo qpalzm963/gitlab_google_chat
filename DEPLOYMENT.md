@@ -171,6 +171,42 @@ npm rebuild better-sqlite3
 vercel deploy --prod --yes
 ```
 
+---
+
+## 啟用互動按鈕（Google Chat Space ID）
+
+互動按鈕（例如 Merge / Approve / Close）需要走 Google Chat API，因此每個要啟用的部門都必須填 `Chat Space ID`（格式：`spaces/XXXXXXXXX`）。
+
+### 你要做（手動）
+
+每個要開啟互動按鈕的部門：
+
+1. 開啟 Google Chat Space
+2. 複製網址列的 Space ID（格式 `spaces/XXXXXXXXX`）
+3. 登入 `https://gitlabgooglechat.vercel.app`
+4. 編輯部門 → `Chat Space ID` 欄位 → 貼上 `spaces/XXXXXXXXX`
+5. 儲存
+
+### 輔助指令（本機）
+
+列出各部門 `Chat Space ID` 是否已填、格式是否正確：
+```bash
+npm run dept:space-status
+```
+
+查 Vercel production logs（只看 `chat-callback`）：
+```bash
+npm run logs:chat-callback
+```
+
+### 驗證方式（部署後）
+
+部署後觸發一個 webhook，查 Vercel logs：
+
+- 看到 `POST /chat-callback 200` → 按鈕成功回調 ✅
+- 看到 `POST /chat-callback 403` → JWT audience 不符（檢查 `CHAT_BOT_ENDPOINT` env var）
+- 完全無 `POST` → `Chat Space ID` 未填或格式錯誤（或訊息不是透過 Chat API 發送）
+
 ### 前端部署到 Vercel
 ```bash
 cd frontend

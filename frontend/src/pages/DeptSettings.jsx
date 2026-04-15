@@ -362,6 +362,17 @@ export default function DeptSettings() {
                     name="space_name"
                     style={{ marginBottom: 0 }}
                     tooltip="填入後將透過 Chat API 發送（支援互動按鈕）。格式：spaces/XXXXXXXXX，可從 Chat Space URL 取得。"
+                    normalize={v => (typeof v === 'string' ? v.trim() : v)}
+                    rules={[
+                      {
+                        validator: async (_, value) => {
+                          if (!value) return
+                          if (!/^spaces\/[A-Za-z0-9]+$/.test(value)) {
+                            throw new Error('格式錯誤，請填入 spaces/XXXXXXXXX')
+                          }
+                        }
+                      }
+                    ]}
                   >
                     <Input placeholder="spaces/XXXXXXXXX" />
                   </Form.Item>

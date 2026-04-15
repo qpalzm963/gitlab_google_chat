@@ -10,6 +10,9 @@
     "db:seed": "node db/seed.js",
     "db:migrate": "node scripts/migrate-sqlite-to-mongo.js",
     "db:migrate:schema": "node scripts/migrate-sqlite-schema-v2.js",
+    "dept:space-status": "node scripts/list-dept-space-ids.js",
+    "chat:ping-card": "node scripts/send-ping-test-card.js",
+    "logs:chat-callback": "npx vercel logs --environment production --since 2m | grep -F \"chat-callback\"",
     "test": "jest --runInBand"
   },
   "dependencies": {
