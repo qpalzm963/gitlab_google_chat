@@ -213,6 +213,7 @@
 .insight-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   gap: 16px;
   padding: 16px 0;
   border-top: 1px solid rgba(45, 36, 27, 0.1);
@@ -221,6 +222,49 @@
 .insight-row:first-child {
   border-top: none;
   padding-top: 0;
+}
+
+.insight-row--clickable {
+  width: 100%;
+  background: transparent;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+  padding-left: 14px;
+  padding-right: 14px;
+  margin-left: -14px;
+  margin-right: -14px;
+  border-radius: 14px;
+  transition: background 0.18s ease, transform 0.18s ease;
+}
+
+.insight-row--clickable:hover {
+  background: rgba(28, 77, 255, 0.06);
+}
+
+.insight-row--clickable:hover .insight-row__chevron {
+  transform: translateX(3px);
+  color: #1c4dff;
+}
+
+.insight-row--clickable:focus-visible {
+  outline: 2px solid #1c4dff;
+  outline-offset: 2px;
+}
+
+.insight-row__right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.insight-row__chevron {
+  color: #bfb3a3;
+  font-size: 12px;
+  transition: transform 0.18s ease, color 0.18s ease;
 }
 
 .insight-row__title {

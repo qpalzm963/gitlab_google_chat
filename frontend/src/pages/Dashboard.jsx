@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Button, Segmented, Spin, Typography } from 'antd'
-import { AlertOutlined, ArrowRightOutlined, PlusOutlined } from '@ant-design/icons'
+import { AlertOutlined, PlusOutlined, RightOutlined } from '@ant-design/icons'
 import {
   Area,
   AreaChart,
@@ -322,36 +322,29 @@ export default function Dashboard() {
 
                     <div className="insight-list">
                       {topDepartments.map(item => (
-                        <div className="insight-row" key={`rank-${item.dept_id}`}>
+                        <button
+                          type="button"
+                          className="insight-row insight-row--clickable"
+                          key={`rank-${item.dept_id}`}
+                          onClick={() => navigate(`/dept/${item.dept_id}`)}
+                          aria-label={`查看 ${item.dept_name} 設定`}
+                        >
                           <div>
                             <p className="insight-row__title">{item.dept_name}</p>
                             <div className="insight-row__meta">
                               成功率 {formatPercent(item.success_rate)} · 最近事件 {formatDateTime(item.last_event_at)}
                             </div>
                           </div>
-                          <div>
+                          <div className="insight-row__right">
                             <div className="insight-row__value">{item.total_events}</div>
                             <span className={`insight-row__badge ${item.failed_events > 0 ? '' : 'insight-row__badge--cool'}`}>
                               {item.failed_events > 0 ? `${item.failed_events} failures` : 'stable'}
                             </span>
+                            <RightOutlined className="insight-row__chevron" />
                           </div>
-                        </div>
+                        </button>
                       ))}
                     </div>
-
-                    {topDepartments[0] && (
-                      <div style={{ marginTop: 18 }}>
-                        <Button
-                          type="link"
-                          style={{ padding: 0, height: 'auto' }}
-                          icon={<ArrowRightOutlined />}
-                          iconPosition="end"
-                          onClick={() => navigate(`/dept/${topDepartments[0].dept_id}`)}
-                        >
-                          直接查看 {topDepartments[0].dept_name} 設定
-                        </Button>
-                      </div>
-                    )}
                   </div>
                 </section>
               </div>
