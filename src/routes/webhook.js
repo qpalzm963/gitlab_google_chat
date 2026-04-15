@@ -279,7 +279,7 @@ function verifyGithubSignature(rawBody, secret, headerSignature) {
 }
 
 function normalizeGithubPrAction(action, pr) {
-  if (action === 'opened') return 'opened'
+  if (action === 'opened' || action === 'reopened') return 'reopen'
   if (action === 'synchronize') return 'updated'
   if (action === 'closed') return pr?.merged ? 'merged' : 'closed'
   return action
