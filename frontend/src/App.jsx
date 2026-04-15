@@ -10,7 +10,17 @@ import DeptLogs from './pages/DeptLogs'
 
 export default function App() {
   return (
-    <ConfigProvider locale={zhTW} theme={{ token: { colorPrimary: '#6b46c1' } }}>
+    <ConfigProvider
+      locale={zhTW}
+      theme={{
+        token: {
+          colorPrimary: '#1c4dff',
+          borderRadius: 18,
+          colorBgLayout: '#f5f1e8',
+          fontFamily: '"IBM Plex Sans TC", "IBM Plex Sans", sans-serif'
+        }
+      }}
+    >
       <AntApp>
         <AuthProvider>
           <BrowserRouter>

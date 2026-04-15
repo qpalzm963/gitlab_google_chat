@@ -1,5 +1,6 @@
 const mongoose = require('mongoose')
 const { v4: uuidv4 } = require('uuid')
+const { buildDashboardMetrics, normalizeRangeDays } = require('../dashboardMetrics')
 
 const schema = new mongoose.Schema({
   _id:              { type: String },
@@ -67,4 +68,29 @@ async function findByDept(departmentId, limit = 50) {
   return docs.map(d => d.toJSON())
 }
 
-module.exports = { create, findByHash, findByDept, findLatestSentByDeptAndMr }
+async function getDashboardOverview({ rangeDays = 7, departments = [] } = {}) {
+  const normalizedRangeDays = normalizeRangeDays(rangeDays)
+  if (departments.length === 0) {
+    return buildDashboardMetrics({ departments: [], logs: [], rangeDays: normalizedRangeDays })
+  }
+
+  const since = new Date(Date.now() - (normalizedRangeDays - 1) * 24 * 60 * 60 * 1000)
+  const docs = await Log.find({
+    department_id: { $in: departments.map(({ id }) => id) },
+    created_at: { $gte: since }
+  }, {
+    department_id: 1,
+    status: 1,
+    created_at: 1
+  })
+    .sort({ created_at: -1 })
+    .lean()
+
+  return buildDashboardMetrics({
+    departments,
+    logs: docs,
+    rangeDays: normalizedRangeDays
+  })
+}
+
+module.exports = { create, findByHash, findByDept, findLatestSentByDeptAndMr, getDashboardOverview }

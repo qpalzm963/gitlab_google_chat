@@ -1,5 +1,6 @@
 const db = require('../../../db/sqlite')
 const { v4: uuidv4 } = require('uuid')
+const { buildDashboardMetrics, normalizeRangeDays } = require('../dashboardMetrics')
 
 function create({ departmentId, eventType, eventAction, gitlabMrIid, payloadHash, status, chatResponseCode, retryCount = 0, errorMessage, chatMessageName }) {
   const id = uuidv4()
@@ -29,4 +30,27 @@ function findByDept(departmentId, limit = 50) {
   ).all(departmentId, limit)
 }
 
-module.exports = { create, findByHash, findByDept, findLatestSentByDeptAndMr }
+function getDashboardOverview({ rangeDays = 7, departments = [] } = {}) {
+  const normalizedRangeDays = normalizeRangeDays(rangeDays)
+  if (departments.length === 0) {
+    return buildDashboardMetrics({ departments: [], logs: [], rangeDays: normalizedRangeDays })
+  }
+
+  const sinceIso = new Date(Date.now() - (normalizedRangeDays - 1) * 24 * 60 * 60 * 1000).toISOString()
+  const placeholders = departments.map(() => '?').join(', ')
+  const logs = db.prepare(`
+    SELECT department_id, status, created_at
+    FROM webhook_logs
+    WHERE department_id IN (${placeholders})
+      AND created_at >= ?
+    ORDER BY created_at DESC
+  `).all(...departments.map(({ id }) => id), sinceIso)
+
+  return buildDashboardMetrics({
+    departments,
+    logs,
+    rangeDays: normalizedRangeDays
+  })
+}
+
+module.exports = { create, findByHash, findByDept, findLatestSentByDeptAndMr, getDashboardOverview }

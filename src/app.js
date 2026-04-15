@@ -32,6 +32,7 @@ if ((process.env.DB_TYPE || 'sqlite').trim() === 'mongodb') {
 }
 
 const authRouter = require('./routes/auth')
+const dashboardRouter = require('./routes/dashboard')
 const departmentsRouter = require('./routes/departments')
 const webhookRouter = require('./routes/webhook')
 const chatCallbackRouter = require('./routes/chatCallback')
@@ -104,6 +105,7 @@ const chatCallbackLimiter = rateLimit({
 app.use('/webhook', webhookLimiter, webhookRouter)
 app.use('/chat-callback', chatCallbackLimiter, chatCallbackRouter)
 app.use('/auth', authRouter)
+app.use('/api/dashboard', dashboardRouter)
 app.use('/api/departments', departmentsRouter)
 
 // Serve React frontend (built by Vite)

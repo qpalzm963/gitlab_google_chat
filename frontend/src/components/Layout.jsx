@@ -26,7 +26,7 @@ export default function AppLayout({ children }) {
             theme="dark"
             mode="horizontal"
             selectedKeys={[location.pathname === '/' ? '/' : '']}
-            items={[{ key: '/', label: '部門管理', onClick: () => navigate('/') }]}
+            items={[{ key: '/', label: '統計儀表板', onClick: () => navigate('/') }]}
             style={{ background: 'transparent', borderBottom: 'none' }}
           />
         </div>
