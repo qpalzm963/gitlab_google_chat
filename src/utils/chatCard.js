@@ -8,7 +8,9 @@ const LABELS = {
     branch: '分支',
     merge: '✅ Merge',
     approve: '👍 Approve',
-    close: '❌ Close MR'
+    close: '❌ Close MR',
+    viewMr: '🔗 查看 MR',
+    viewPr: '🔗 查看 PR'
   },
   en: {
     opened: 'New MR',
@@ -19,12 +21,34 @@ const LABELS = {
     branch: 'Branch',
     merge: '✅ Merge',
     approve: '👍 Approve',
-    close: '❌ Close MR'
+    close: '❌ Close MR',
+    viewMr: '🔗 View MR',
+    viewPr: '🔗 View PR'
   }
 }
 
 function isGithubPrPayload(payload) {
   return !!(payload && payload.pull_request && payload.repository)
+}
+
+function buildChatAction(method, params) {
+  const actionUrl = (process.env.CHAT_BOT_ENDPOINT || '').trim()
+  const parameters = [
+    { key: 'method', value: method },
+    ...params
+  ]
+
+  if (actionUrl) {
+    return {
+      function: actionUrl,
+      parameters
+    }
+  }
+
+  return {
+    function: method,
+    parameters: params
+  }
 }
 
 function buildCard(dept, payload) {
@@ -48,6 +72,9 @@ function buildGitlabMrCard(dept, mrPayload, t) {
   const targetBranch = mr.target_branch || ''
   const mrIid = mr.iid || ''
   const projectId = project.id || ''
+  const mrUrl = mr.url || ''
+
+  const isClosed = action === 'merged' || action === 'closed'
 
   const sections = [
     {
@@ -71,49 +98,53 @@ function buildGitlabMrCard(dept, mrPayload, t) {
   // 按鈕區塊（依開關決定顯示）
   const buttons = []
 
-  if (dept.ev_allow_merge_btn) {
+  if (mrUrl) {
+    buttons.push({
+      text: t.viewMr,
+      onClick: { openLink: { url: mrUrl } }
+    })
+  }
+
+  if (dept.ev_allow_merge_btn && !isClosed) {
     buttons.push({
       text: t.merge,
       onClick: {
         action: {
-          function: 'merge_mr',
-          parameters: [
+          ...buildChatAction('merge_mr', [
             { key: 'project_id', value: String(projectId) },
             { key: 'mr_iid', value: String(mrIid) },
             { key: 'dept_id', value: dept.id }
-          ]
+          ])
         }
       }
     })
   }
 
-  if (dept.ev_allow_approve_btn) {
+  if (dept.ev_allow_approve_btn && !isClosed) {
     buttons.push({
       text: t.approve,
       onClick: {
         action: {
-          function: 'approve_mr',
-          parameters: [
+          ...buildChatAction('approve_mr', [
             { key: 'project_id', value: String(projectId) },
             { key: 'mr_iid', value: String(mrIid) },
             { key: 'dept_id', value: dept.id }
-          ]
+          ])
         }
       }
     })
   }
 
-  if (dept.ev_allow_close_btn) {
+  if (dept.ev_allow_close_btn && !isClosed) {
     buttons.push({
       text: t.close,
       onClick: {
         action: {
-          function: 'close_mr',
-          parameters: [
+          ...buildChatAction('close_mr', [
             { key: 'project_id', value: String(projectId) },
             { key: 'mr_iid', value: String(mrIid) },
             { key: 'dept_id', value: dept.id }
-          ]
+          ])
         }
       }
     })
@@ -124,6 +155,7 @@ function buildGitlabMrCard(dept, mrPayload, t) {
   }
 
   return {
+    text: `${title} [!${mrIid}] ${mrTitle} (${sourceBranch} -> ${targetBranch})`,
     cardsV2: [
       {
         cardId: `mr-${projectId}-${mrIid}`,
@@ -154,6 +186,9 @@ function buildGithubPrCard(dept, payload, t) {
   const authorName = pr?.user?.login || pr?.user?.name || 'Unknown'
   const sourceBranch = pr?.head?.ref || ''
   const targetBranch = pr?.base?.ref || ''
+  const prUrl = pr.html_url || ''
+
+  const isClosed = action === 'merged' || action === 'closed'
 
   const sections = [
     {
@@ -176,52 +211,56 @@ function buildGithubPrCard(dept, payload, t) {
 
   const buttons = []
 
-  if (dept.ev_allow_merge_btn) {
+  if (prUrl) {
+    buttons.push({
+      text: t.viewPr,
+      onClick: { openLink: { url: prUrl } }
+    })
+  }
+
+  if (dept.ev_allow_merge_btn && !isClosed) {
     buttons.push({
       text: t.merge,
       onClick: {
         action: {
-          function: 'merge_mr',
-          parameters: [
+          ...buildChatAction('merge_mr', [
             { key: 'owner', value: String(owner) },
             { key: 'repo', value: String(repoName) },
             { key: 'pr_number', value: String(prNumber) },
             { key: 'dept_id', value: dept.id }
-          ]
+          ])
         }
       }
     })
   }
 
-  if (dept.ev_allow_approve_btn) {
+  if (dept.ev_allow_approve_btn && !isClosed) {
     buttons.push({
       text: t.approve,
       onClick: {
         action: {
-          function: 'approve_mr',
-          parameters: [
+          ...buildChatAction('approve_mr', [
             { key: 'owner', value: String(owner) },
             { key: 'repo', value: String(repoName) },
             { key: 'pr_number', value: String(prNumber) },
             { key: 'dept_id', value: dept.id }
-          ]
+          ])
         }
       }
     })
   }
 
-  if (dept.ev_allow_close_btn) {
+  if (dept.ev_allow_close_btn && !isClosed) {
     buttons.push({
       text: t.close,
       onClick: {
         action: {
-          function: 'close_mr',
-          parameters: [
+          ...buildChatAction('close_mr', [
             { key: 'owner', value: String(owner) },
             { key: 'repo', value: String(repoName) },
             { key: 'pr_number', value: String(prNumber) },
             { key: 'dept_id', value: dept.id }
-          ]
+          ])
         }
       }
     })
@@ -232,6 +271,7 @@ function buildGithubPrCard(dept, payload, t) {
   }
 
   return {
+    text: `${title} [#${prNumber}] ${prTitle} (${sourceBranch} -> ${targetBranch})`,
     cardsV2: [
       {
         cardId: `pr-${owner}-${repoName}-${prNumber}`,
