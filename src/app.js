@@ -57,10 +57,17 @@ app.use(helmet({
     }
   }
 }))
-app.use(cors({
+const corsMiddleware = cors({
   origin: (process.env.FRONTEND_URL || 'http://localhost:5173').trim(),
   credentials: true
-}))
+})
+
+// Authenticated API responses should not be cached by browsers or proxies.
+app.use(['/api', '/auth', '/webhook', '/chat-callback'], (req, res, next) => {
+  res.set('Cache-Control', 'no-store, max-age=0')
+  next()
+})
+app.use(['/api', '/auth'], corsMiddleware)
 // GitHub webhooks can be configured to send `application/x-www-form-urlencoded`.
 // Capture raw bytes for signature verification, and parse urlencoded bodies.
 app.use(express.urlencoded({

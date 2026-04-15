@@ -8,6 +8,21 @@ const client = new OAuth2Client()
 const PLATFORM_GITLAB = 'gitlab'
 const PLATFORM_GITHUB = 'github'
 
+function chatReply(text, event) {
+  if (isAddonEvent(event)) {
+    return {
+      hostAppDataAction: {
+        chatDataAction: {
+          createMessageAction: {
+            message: { text }
+          }
+        }
+      }
+    }
+  }
+  return { text }
+}
+
 router.post('/', async (req, res) => {
   try {
     // 1. 驗證 Google JWT
@@ -19,34 +34,42 @@ router.post('/', async (req, res) => {
     try {
       await client.verifyIdToken({
         idToken: token,
-        audience: process.env.CHAT_BOT_ENDPOINT
+        audience: (process.env.CHAT_BOT_ENDPOINT || '').trim()
       })
     } catch (err) {
       console.error('[chat-callback] JWT verification failed:', err.message)
-      try {
-        const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
-        console.error('[chat-callback] JWT aud received:', payload.aud, '| expected:', process.env.CHAT_BOT_ENDPOINT)
-      } catch {}
       return res.status(403).json({ error: 'Invalid Google JWT' })
     }
 
-    // 2. 解析 action
+    // 2. 解析 action（method 在 parameters 裡，function 是 endpoint URL）
     const event = req.body
-    const action = event?.common?.invokedFunction || event?.action?.function
-    const params = parseParams(event?.common?.parameters || event?.action?.parameters)
+    const params = parseParams(
+      event?.common?.parameters
+      || event?.action?.parameters
+      || event?.commonEventObject?.parameters
+    )
+    const action = params.method
+      || event?.common?.invokedFunction
+      || event?.action?.actionMethodName
+      || event?.action?.function
+      || null
 
     const deptId = params.dept_id
 
     console.log('[chat-callback] action=%s deptId=%s', action, deptId)
 
+    if (action === 'ping_test') {
+      return res.json(chatReply('pong from /chat-callback', event))
+    }
+
     if (!action || !deptId) {
       console.error('[chat-callback] Missing params, body:', JSON.stringify(req.body))
-      return res.json({ text: '❌ 請求參數不完整，無法處理此操作。' })
+      return res.json(chatReply('❌ 請求參數不完整，無法處理此操作。', event))
     }
 
     // 3. 查詢部門設定
     const dept = await repo.dept.findById(deptId, { decrypt: true })
-    if (!dept) return res.json({ text: '❌ 找不到部門設定。' })
+    if (!dept) return res.json(chatReply('❌ 找不到部門設定。', event))
 
     const platform = dept.platform || PLATFORM_GITLAB
 
@@ -57,7 +80,7 @@ router.post('/', async (req, res) => {
       close_mr: dept.ev_allow_close_btn
     }
     if (!allowed[action]) {
-      return res.json({ text: '❌ 此操作未啟用，請至管理介面開啟對應按鈕權限。' })
+      return res.json(chatReply('❌ 此操作未啟用，請至管理介面開啟對應按鈕權限。', event))
     }
 
     // 5. 依平台分流
@@ -67,10 +90,10 @@ router.post('/', async (req, res) => {
       const prNumber = params.pr_number
 
       if (!owner || !repoName || !prNumber) {
-        return res.json({ text: '❌ GitHub 參數不完整（owner / repo / pr_number）。' })
+        return res.json(chatReply('❌ GitHub 參數不完整（owner / repo / pr_number）。', event))
       }
       if (!dept.github_token) {
-        return res.json({ text: '❌ GitHub Token 尚未設定，請聯絡管理員更新設定。' })
+        return res.json(chatReply('❌ GitHub Token 尚未設定，請聯絡管理員更新設定。', event))
       }
 
       const apiBase = process.env.GITHUB_API_BASE_URL || 'https://api.github.com'
@@ -98,22 +121,22 @@ router.post('/', async (req, res) => {
           body: JSON.stringify({ state: 'closed' })
         })
       } else {
-        return res.json({ text: '❌ 不支援的操作類型。' })
+        return res.json(chatReply('❌ 不支援的操作類型。', event))
       }
 
       if (ghRes.status === 401 || ghRes.status === 403) {
-        return res.json({ text: '❌ GitHub Token 已失效或權限不足，請聯絡管理員更新設定。' })
+        return res.json(chatReply('❌ GitHub Token 已失效或權限不足，請聯絡管理員更新設定。', event))
       }
       if (ghRes.status === 409) {
-        return res.json({ text: '❌ 無法 Merge：PR 有衝突或狀態不允許。' })
+        return res.json(chatReply('❌ 無法 Merge：PR 有衝突或狀態不允許。', event))
       }
       if (ghRes.status === 422) {
-        return res.json({ text: '❌ 無法 Approve：不能 Approve 自己的 PR，或 PR 狀態不允許。' })
+        return res.json(chatReply('❌ 無法 Approve：不能 Approve 自己的 PR，或 PR 狀態不允許。', event))
       }
       if (!ghRes.ok) {
         const body = await ghRes.text()
         console.error('[chat-callback] GitHub error %d: %s', ghRes.status, body)
-        return res.json({ text: `❌ GitHub 操作失敗 (HTTP ${ghRes.status})，請聯絡管理員確認設定。` })
+        return res.json(chatReply(`❌ GitHub 操作失敗 (HTTP ${ghRes.status})，請聯絡管理員確認設定。`, event))
       }
 
       const messages = {
@@ -121,7 +144,7 @@ router.post('/', async (req, res) => {
         approve_mr: '👍 PR 已 Approve！',
         close_mr: '🔒 PR 已關閉。'
       }
-      return res.json({ text: messages[action] })
+      return res.json(chatReply(messages[action], event))
     }
 
     // 6. GitLab
@@ -129,10 +152,10 @@ router.post('/', async (req, res) => {
     const mrIid = params.mr_iid
 
     if (!projectId || !mrIid) {
-      return res.json({ text: '❌ GitLab 參數不完整（project_id / mr_iid）。' })
+      return res.json(chatReply('❌ GitLab 參數不完整（project_id / mr_iid）。', event))
     }
     if (!dept.gitlab_base_url || !dept.gitlab_token) {
-      return res.json({ text: '❌ GitLab 設定不完整，請聯絡管理員更新設定。' })
+      return res.json(chatReply('❌ GitLab 設定不完整，請聯絡管理員更新設定。', event))
     }
 
     const baseUrl = `${dept.gitlab_base_url}/api/v4/projects/${projectId}/merge_requests/${mrIid}`
@@ -149,19 +172,19 @@ router.post('/', async (req, res) => {
         body: JSON.stringify({ state_event: 'close' })
       })
     } else {
-      return res.json({ text: '❌ 不支援的操作類型。' })
+      return res.json(chatReply('❌ 不支援的操作類型。', event))
     }
 
     if (gitlabRes.status === 401) {
-      return res.json({ text: '❌ GitLab Token 已失效，請聯絡管理員更新設定。' })
+      return res.json(chatReply('❌ GitLab Token 已失效，請聯絡管理員更新設定。', event))
     }
     if (gitlabRes.status === 405) {
-      return res.json({ text: '❌ 無法執行：CI 尚未通過或 MR 狀態不允許此操作。' })
+      return res.json(chatReply('❌ 無法執行：CI 尚未通過或 MR 狀態不允許此操作。', event))
     }
     if (!gitlabRes.ok) {
       const body = await gitlabRes.text()
       console.error('[chat-callback] GitLab error %d: %s', gitlabRes.status, body)
-      return res.json({ text: `❌ GitLab 操作失敗 (HTTP ${gitlabRes.status})，請聯絡管理員確認設定。` })
+      return res.json(chatReply(`❌ GitLab 操作失敗 (HTTP ${gitlabRes.status})，請聯絡管理員確認設定。`, event))
     }
 
     const messages = {
@@ -169,11 +192,11 @@ router.post('/', async (req, res) => {
       approve_mr: '👍 MR 已 Approve！',
       close_mr: '🔒 MR 已關閉。'
     }
-    return res.json({ text: messages[action] })
+    return res.json(chatReply(messages[action], event))
 
   } catch (err) {
     console.error('[chat-callback] Unhandled error:', err)
-    return res.json({ text: '❌ 伺服器內部錯誤，請聯絡管理員。' })
+    return res.json(chatReply('❌ 伺服器內部錯誤，請聯絡管理員。', req.body))
   }
 })
 
@@ -183,6 +206,10 @@ function parseParams(params) {
     return params.reduce((acc, p) => ({ ...acc, [p.key]: p.value }), {})
   }
   return params
+}
+
+function isAddonEvent(event) {
+  return Boolean(event?.commonEventObject || event?.chat || event?.authorizationEventObject)
 }
 
 module.exports = router
