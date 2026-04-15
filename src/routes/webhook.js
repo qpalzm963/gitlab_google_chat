@@ -86,7 +86,7 @@ async function handleGitlabWebhook(req, res, dept) {
   }
 
   // 6. 送 Google Chat Card（或更新既有卡片）
-  const summary = (dept.ev_ai_summary && eventAction === 'opened')
+  const summary = (dept.ev_ai_summary && NEW_CARD_ACTIONS.has(eventAction))
     ? await getMrSummary(dept, payload, PLATFORM_GITLAB)
     : null
   const card = buildCard(dept, payload, { summary })
@@ -96,8 +96,8 @@ async function handleGitlabWebhook(req, res, dept) {
   let chatMessageName = null
 
   try {
-    // 非 opened 事件：嘗試查既有卡片 message name 並原地更新
-    const existingLog = (eventAction && eventAction !== 'opened' && mrIid)
+    // reopen/opened：強制發新卡片；其他事件嘗試原地更新既有卡片
+    const existingLog = (eventAction && !NEW_CARD_ACTIONS.has(eventAction) && mrIid)
       ? await repo.log.findLatestSentByDeptAndMr(dept.id, mrIid)
       : null
     const existingMessageName = existingLog?.chat_message_name || null
@@ -207,7 +207,7 @@ async function handleGithubWebhook(req, res, dept) {
   }
 
   // 5. 送 Google Chat Card（或更新既有卡片）
-  const summary = (dept.ev_ai_summary && eventAction === 'opened')
+  const summary = (dept.ev_ai_summary && NEW_CARD_ACTIONS.has(eventAction))
     ? await getMrSummary(dept, payload, PLATFORM_GITHUB)
     : null
   const card = buildCard(dept, payload, { summary })
@@ -217,7 +217,7 @@ async function handleGithubWebhook(req, res, dept) {
   let chatMessageName = null
 
   try {
-    const existingLog = (eventAction && eventAction !== 'opened' && prNumber)
+    const existingLog = (eventAction && !NEW_CARD_ACTIONS.has(eventAction) && prNumber)
       ? await repo.log.findLatestSentByDeptAndMr(dept.id, prNumber)
       : null
     const existingMessageName = existingLog?.chat_message_name || null
@@ -286,11 +286,14 @@ function normalizeGithubPrAction(action, pr) {
 }
 
 function shouldNotify(dept, action) {
-  if (action === 'open' || action === 'opened') return dept.ev_mr_opened
+  if (action === 'open' || action === 'opened' || action === 'reopen') return dept.ev_mr_opened
   if (action === 'update' || action === 'updated') return dept.ev_mr_updated
   if (action === 'merge' || action === 'merged') return dept.ev_mr_merged
   return true
 }
+
+// Actions that should always send a new card (not update an existing one)
+const NEW_CARD_ACTIONS = new Set(['opened', 'open', 'reopen'])
 
 function tryParseJson(value) {
   if (!value) return null
