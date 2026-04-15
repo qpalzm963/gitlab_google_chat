@@ -3,7 +3,7 @@ const crypto = require('crypto')
 const repo = require('../repositories')
 const { buildPayloadHash, sha256 } = require('../utils/hash')
 const { buildCard } = require('../utils/chatCard')
-const { sendCard } = require('../utils/chatSend')
+const { sendCard, updateCard } = require('../utils/chatSend')
 
 const router = express.Router()
 
@@ -84,19 +84,43 @@ async function handleGitlabWebhook(req, res, dept) {
     return res.status(200).json({ message: 'Event filtered by settings' })
   }
 
-  // 6. 送 Google Chat Card
+  // 6. 送 Google Chat Card（或更新既有卡片）
   const card = buildCard(dept, payload)
   let chatResponseCode = null
   let errorMessage = null
   let status = 'sent'
+  let chatMessageName = null
 
   try {
-    const response = await sendCard(dept.space_name, dept.chat_webhook_url, card)
-    chatResponseCode = response.status
-    if (!response.ok) {
-      const body = await response.text()
-      throw new Error(`HTTP ${response.status}: ${body}`)
+    // 非 opened 事件：嘗試查既有卡片 message name 並原地更新
+    const existingLog = (eventAction && eventAction !== 'opened' && mrIid)
+      ? await repo.log.findLatestSentByDeptAndMr(dept.id, mrIid)
+      : null
+    const existingMessageName = existingLog?.chat_message_name || null
+
+    let result
+    if (existingMessageName) {
+      const res = await updateCard(existingMessageName, card)
+      const bodyText = await res.text()
+      const bodyJson = tryParseJson(bodyText)
+      result = { response: res, transport: 'chat_api_update', bodyText, bodyJson }
+      chatMessageName = existingMessageName
+    } else {
+      result = await sendCard(dept.space_name, dept.chat_webhook_url, card)
+      chatMessageName = result.bodyJson?.name || null
     }
+
+    chatResponseCode = result.response.status
+    if (!result.response.ok) {
+      throw new Error(`HTTP ${result.response.status}: ${result.bodyText}`)
+    }
+    console.log(
+      '[webhook][gitlab] sent transport=%s space=%s message=%s status=%s',
+      result.transport,
+      dept.space_name || '(webhook-only)',
+      chatMessageName || '(unknown)',
+      result.response.status
+    )
   } catch (err) {
     status = 'failed'
     errorMessage = err.message
@@ -106,7 +130,7 @@ async function handleGitlabWebhook(req, res, dept) {
   await repo.log.create({
     departmentId: dept.id, eventType, eventAction,
     gitlabMrIid: mrIid, payloadHash: hash,
-    status, chatResponseCode, errorMessage
+    status, chatResponseCode, errorMessage, chatMessageName
   })
 
   if (status !== 'sent') console.log('[webhook][gitlab] send failed: %s', errorMessage || '(unknown)')
@@ -117,6 +141,7 @@ async function handleGithubWebhook(req, res, dept) {
   const ghEvent = req.headers['x-github-event']
   const delivery = req.headers['x-github-delivery']
   const signature = req.headers['x-hub-signature-256']
+  const contentType = req.headers['content-type']
 
   // 1. 僅處理 pull_request events
   if (!GITHUB_SUPPORTED_EVENTS.has(ghEvent)) {
@@ -154,6 +179,15 @@ async function handleGithubWebhook(req, res, dept) {
 
   // normalize actions to reuse existing switches
   const eventAction = normalizeGithubPrAction(rawAction, pr)
+  console.log(
+    '[webhook][github] delivery=%s contentType=%s action=%s rawAction=%s repo=%s pr=%s',
+    delivery || '(missing)',
+    contentType || '(missing)',
+    eventAction || '(missing)',
+    rawAction || '(missing)',
+    repoFullName || '(missing)',
+    prNumber || '(missing)'
+  )
 
   // 3. 去重（優先用 X-GitHub-Delivery）
   const dedupeKey = delivery || sha256(raw.toString('utf8'))
@@ -168,19 +202,42 @@ async function handleGithubWebhook(req, res, dept) {
     return res.status(200).json({ message: 'Event filtered by settings' })
   }
 
-  // 5. 送 Google Chat Card
+  // 5. 送 Google Chat Card（或更新既有卡片）
   const card = buildCard(dept, payload)
   let chatResponseCode = null
   let errorMessage = null
   let status = 'sent'
+  let chatMessageName = null
 
   try {
-    const response = await sendCard(dept.space_name, dept.chat_webhook_url, card)
-    chatResponseCode = response.status
-    if (!response.ok) {
-      const body = await response.text()
-      throw new Error(`HTTP ${response.status}: ${body}`)
+    const existingLog = (eventAction && eventAction !== 'opened' && prNumber)
+      ? await repo.log.findLatestSentByDeptAndMr(dept.id, prNumber)
+      : null
+    const existingMessageName = existingLog?.chat_message_name || null
+
+    let result
+    if (existingMessageName) {
+      const res = await updateCard(existingMessageName, card)
+      const bodyText = await res.text()
+      const bodyJson = tryParseJson(bodyText)
+      result = { response: res, transport: 'chat_api_update', bodyText, bodyJson }
+      chatMessageName = existingMessageName
+    } else {
+      result = await sendCard(dept.space_name, dept.chat_webhook_url, card)
+      chatMessageName = result.bodyJson?.name || null
     }
+
+    chatResponseCode = result.response.status
+    if (!result.response.ok) {
+      throw new Error(`HTTP ${result.response.status}: ${result.bodyText}`)
+    }
+    console.log(
+      '[webhook][github] sent transport=%s space=%s message=%s status=%s',
+      result.transport,
+      dept.space_name || '(webhook-only)',
+      chatMessageName || '(unknown)',
+      result.response.status
+    )
   } catch (err) {
     status = 'failed'
     errorMessage = err.message
@@ -189,7 +246,7 @@ async function handleGithubWebhook(req, res, dept) {
   await repo.log.create({
     departmentId: dept.id, eventType, eventAction,
     gitlabMrIid: prNumber, payloadHash: hash,
-    status, chatResponseCode, errorMessage
+    status, chatResponseCode, errorMessage, chatMessageName
   })
 
   if (status !== 'sent') console.log('[webhook][github] send failed: %s', errorMessage || '(unknown)')
@@ -226,6 +283,11 @@ function shouldNotify(dept, action) {
   if (action === 'update' || action === 'updated') return dept.ev_mr_updated
   if (action === 'merge' || action === 'merged') return dept.ev_mr_merged
   return true
+}
+
+function tryParseJson(value) {
+  if (!value) return null
+  try { return JSON.parse(value) } catch { return null }
 }
 
 module.exports = router

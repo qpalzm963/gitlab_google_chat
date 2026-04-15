@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS webhook_logs (
   chat_response_code INTEGER,
   retry_count        INTEGER NOT NULL DEFAULT 0,
   error_message      TEXT,
+  chat_message_name  TEXT,
   created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 

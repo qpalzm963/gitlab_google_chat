@@ -62,5 +62,15 @@ function migrateDepartmentsTableV2() {
   console.log('✓ SQLite departments migrated to v2 (GitHub support)')
 }
 
+function migrateWebhookLogsV2() {
+  if (hasColumn('webhook_logs', 'chat_message_name')) {
+    console.log('✓ webhook_logs.chat_message_name already exists')
+    return
+  }
+  db.prepare('ALTER TABLE webhook_logs ADD COLUMN chat_message_name TEXT').run()
+  console.log('✓ webhook_logs.chat_message_name column added')
+}
+
 migrateDepartmentsTableV2()
+migrateWebhookLogsV2()
 

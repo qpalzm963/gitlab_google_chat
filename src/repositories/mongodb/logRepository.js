@@ -12,6 +12,7 @@ const schema = new mongoose.Schema({
   chat_response_code: { type: Number, default: null },
   retry_count:      { type: Number, default: 0 },
   error_message:    { type: String, default: null },
+  chat_message_name: { type: String, default: null },
 }, {
   timestamps: { createdAt: 'created_at', updatedAt: false },
   toJSON: {
@@ -28,7 +29,7 @@ schema.index({ department_id: 1, created_at: -1 })
 
 const Log = mongoose.models.WebhookLog || mongoose.model('WebhookLog', schema)
 
-async function create({ departmentId, eventType, eventAction, gitlabMrIid, payloadHash, status, chatResponseCode, retryCount = 0, errorMessage }) {
+async function create({ departmentId, eventType, eventAction, gitlabMrIid, payloadHash, status, chatResponseCode, retryCount = 0, errorMessage, chatMessageName }) {
   const id = uuidv4()
   await Log.create({
     _id: id,
@@ -41,8 +42,18 @@ async function create({ departmentId, eventType, eventAction, gitlabMrIid, paylo
     chat_response_code: chatResponseCode || null,
     retry_count: retryCount,
     error_message: errorMessage || null,
+    chat_message_name: chatMessageName || null,
   })
   return id
+}
+
+async function findLatestSentByDeptAndMr(departmentId, mrIid) {
+  return Log.findOne({
+    department_id: departmentId,
+    gitlab_mr_iid: mrIid,
+    status: 'sent',
+    chat_message_name: { $ne: null }
+  }, { chat_message_name: 1 }).sort({ created_at: -1 }).lean()
 }
 
 async function findByHash(payloadHash) {
@@ -56,4 +67,4 @@ async function findByDept(departmentId, limit = 50) {
   return docs.map(d => d.toJSON())
 }
 
-module.exports = { create, findByHash, findByDept }
+module.exports = { create, findByHash, findByDept, findLatestSentByDeptAndMr }
