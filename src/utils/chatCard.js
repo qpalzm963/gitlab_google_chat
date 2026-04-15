@@ -10,7 +10,8 @@ const LABELS = {
     approve: '👍 Approve',
     close: '❌ Close MR',
     viewMr: '🔗 查看 MR',
-    viewPr: '🔗 查看 PR'
+    viewPr: '🔗 查看 PR',
+    aiSummary: '🤖 AI 摘要'
   },
   en: {
     opened: 'New MR',
@@ -23,7 +24,8 @@ const LABELS = {
     approve: '👍 Approve',
     close: '❌ Close MR',
     viewMr: '🔗 View MR',
-    viewPr: '🔗 View PR'
+    viewPr: '🔗 View PR',
+    aiSummary: '🤖 AI Summary'
   }
 }
 
@@ -51,16 +53,31 @@ function buildChatAction(method, params) {
   }
 }
 
-function buildCard(dept, payload) {
+function buildCard(dept, payload, { summary } = {}) {
   const lang = dept.lang || 'zh-TW'
   const t = LABELS[lang] || LABELS['zh-TW']
   if (isGithubPrPayload(payload)) {
-    return buildGithubPrCard(dept, payload, t)
+    return buildGithubPrCard(dept, payload, t, summary)
   }
-  return buildGitlabMrCard(dept, payload, t)
+  return buildGitlabMrCard(dept, payload, t, summary)
 }
 
-function buildGitlabMrCard(dept, mrPayload, t) {
+function buildSummarySection(t, summary) {
+  if (!summary) return null
+  return {
+    widgets: [
+      {
+        decoratedText: {
+          topLabel: t.aiSummary,
+          text: summary,
+          wrapText: true
+        }
+      }
+    ]
+  }
+}
+
+function buildGitlabMrCard(dept, mrPayload, t, summary) {
   const action = mrPayload.object_attributes?.action || 'opened'
   const mr = mrPayload.object_attributes || {}
   const project = mrPayload.project || {}
@@ -75,6 +92,8 @@ function buildGitlabMrCard(dept, mrPayload, t) {
   const mrUrl = mr.url || ''
 
   const isClosed = action === 'merged' || action === 'closed'
+
+  const summarySection = buildSummarySection(t, summary)
 
   const sections = [
     {
@@ -92,7 +111,8 @@ function buildGitlabMrCard(dept, mrPayload, t) {
           }
         }
       ]
-    }
+    },
+    ...(summarySection ? [summarySection] : [])
   ]
 
   // 按鈕區塊（依開關決定顯示）
@@ -173,7 +193,7 @@ function buildGitlabMrCard(dept, mrPayload, t) {
   }
 }
 
-function buildGithubPrCard(dept, payload, t) {
+function buildGithubPrCard(dept, payload, t, summary) {
   const action = normalizeGithubPrAction(payload?.action, payload?.pull_request)
   const title = t[action] || action
 
@@ -189,6 +209,8 @@ function buildGithubPrCard(dept, payload, t) {
   const prUrl = pr.html_url || ''
 
   const isClosed = action === 'merged' || action === 'closed'
+
+  const summarySection = buildSummarySection(t, summary)
 
   const sections = [
     {
@@ -206,7 +228,8 @@ function buildGithubPrCard(dept, payload, t) {
           }
         }
       ]
-    }
+    },
+    ...(summarySection ? [summarySection] : [])
   ]
 
   const buttons = []

@@ -4,6 +4,7 @@ const repo = require('../repositories')
 const { buildPayloadHash, sha256 } = require('../utils/hash')
 const { buildCard } = require('../utils/chatCard')
 const { sendCard, updateCard } = require('../utils/chatSend')
+const { getMrSummary } = require('../utils/aiSummary')
 
 const router = express.Router()
 
@@ -85,7 +86,10 @@ async function handleGitlabWebhook(req, res, dept) {
   }
 
   // 6. 送 Google Chat Card（或更新既有卡片）
-  const card = buildCard(dept, payload)
+  const summary = (dept.ev_ai_summary && eventAction === 'opened')
+    ? await getMrSummary(dept, payload, PLATFORM_GITLAB)
+    : null
+  const card = buildCard(dept, payload, { summary })
   let chatResponseCode = null
   let errorMessage = null
   let status = 'sent'
@@ -203,7 +207,10 @@ async function handleGithubWebhook(req, res, dept) {
   }
 
   // 5. 送 Google Chat Card（或更新既有卡片）
-  const card = buildCard(dept, payload)
+  const summary = (dept.ev_ai_summary && eventAction === 'opened')
+    ? await getMrSummary(dept, payload, PLATFORM_GITHUB)
+    : null
+  const card = buildCard(dept, payload, { summary })
   let chatResponseCode = null
   let errorMessage = null
   let status = 'sent'

@@ -45,7 +45,7 @@ function parseBooleans(row) {
   const boolCols = [
     'ev_mr_opened', 'ev_mr_updated', 'ev_mr_merged',
     'ev_allow_merge_btn', 'ev_allow_approve_btn', 'ev_allow_close_btn',
-    'is_active'
+    'ev_ai_summary', 'is_active'
   ]
   const result = { ...row }
   for (const col of boolCols) {
@@ -93,8 +93,8 @@ function create(data) {
       space_name, lang,
       ev_mr_opened, ev_mr_updated, ev_mr_merged,
       ev_allow_merge_btn, ev_allow_approve_btn, ev_allow_close_btn,
-      notify_cooldown_seconds, is_active
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ev_ai_summary, notify_cooldown_seconds, is_active
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id, enc.name, enc.platform || PLATFORM_GITLAB,
     enc.gitlab_base_url || null, enc.gitlab_project_id || null, enc.gitlab_token_enc || null,
@@ -107,6 +107,7 @@ function create(data) {
     toInt(enc.ev_allow_merge_btn) ?? 1,
     toInt(enc.ev_allow_approve_btn) ?? 0,
     toInt(enc.ev_allow_close_btn) ?? 0,
+    toInt(enc.ev_ai_summary) ?? 0,
     enc.notify_cooldown_seconds || 0,
     computeIsActive(enc)
   )
@@ -125,7 +126,8 @@ function update(id, data) {
 
   const boolCols = new Set([
     'ev_mr_opened', 'ev_mr_updated', 'ev_mr_merged',
-    'ev_allow_merge_btn', 'ev_allow_approve_btn', 'ev_allow_close_btn'
+    'ev_allow_merge_btn', 'ev_allow_approve_btn', 'ev_allow_close_btn',
+    'ev_ai_summary'
   ])
   const allowed = [
     'name', 'platform',
@@ -135,6 +137,7 @@ function update(id, data) {
     'space_name', 'lang',
     'ev_mr_opened', 'ev_mr_updated', 'ev_mr_merged',
     'ev_allow_merge_btn', 'ev_allow_approve_btn', 'ev_allow_close_btn',
+    'ev_ai_summary',
     'notify_cooldown_seconds'
   ]
 

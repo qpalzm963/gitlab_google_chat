@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS departments (
   ev_allow_merge_btn       INTEGER NOT NULL DEFAULT 1,
   ev_allow_approve_btn     INTEGER NOT NULL DEFAULT 0,
   ev_allow_close_btn       INTEGER NOT NULL DEFAULT 0,
+  ev_ai_summary            INTEGER NOT NULL DEFAULT 0,
   notify_cooldown_seconds  INTEGER NOT NULL DEFAULT 0,
   is_active                INTEGER NOT NULL DEFAULT 0,
   deleted_at               TEXT,

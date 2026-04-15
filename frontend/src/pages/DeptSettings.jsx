@@ -25,6 +25,7 @@ const EVENTS = [
   { name: 'ev_allow_merge_btn',  label: '允許 Chat 一鍵 Merge', desc: '通知卡片顯示 Merge 按鈕' },
   { name: 'ev_allow_approve_btn',label: '允許 Chat Approve',    desc: '通知卡片顯示 Approve 按鈕' },
   { name: 'ev_allow_close_btn',  label: '允許 Chat Close MR',   desc: '通知卡片顯示 Close 按鈕' },
+  { name: 'ev_ai_summary',       label: '🤖 AI 摘要',            desc: 'MR 開啟時自動附上 Gemini 變更摘要（需設定 GEMINI_API_KEY）' },
 ]
 
 function SectionLabel({ children }) {

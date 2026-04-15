@@ -27,6 +27,7 @@ const schema = new mongoose.Schema({
   ev_allow_merge_btn:    { type: Boolean, default: true },
   ev_allow_approve_btn:  { type: Boolean, default: false },
   ev_allow_close_btn:    { type: Boolean, default: false },
+  ev_ai_summary:         { type: Boolean, default: false },
   notify_cooldown_seconds: { type: Number, default: 0 },
   is_active:             { type: Boolean, default: false },
   deleted_at:            { type: Date, default: null },
@@ -128,6 +129,7 @@ async function create(data) {
     ev_allow_merge_btn:    enc.ev_allow_merge_btn    ?? true,
     ev_allow_approve_btn:  enc.ev_allow_approve_btn  ?? false,
     ev_allow_close_btn:    enc.ev_allow_close_btn    ?? false,
+    ev_ai_summary:         enc.ev_ai_summary         ?? false,
     notify_cooldown_seconds: enc.notify_cooldown_seconds || 0,
     is_active: computeIsActive(enc),
   })
@@ -159,6 +161,7 @@ async function update(id, data) {
     'space_name', 'lang',
     'ev_mr_opened', 'ev_mr_updated', 'ev_mr_merged',
     'ev_allow_merge_btn', 'ev_allow_approve_btn', 'ev_allow_close_btn',
+    'ev_ai_summary',
     'notify_cooldown_seconds'
   ]
 

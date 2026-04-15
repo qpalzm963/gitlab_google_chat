@@ -71,6 +71,16 @@ function migrateWebhookLogsV2() {
   console.log('✓ webhook_logs.chat_message_name column added')
 }
 
+function migrateDepartmentsAiSummary() {
+  if (hasColumn('departments', 'ev_ai_summary')) {
+    console.log('✓ departments.ev_ai_summary already exists')
+    return
+  }
+  db.prepare('ALTER TABLE departments ADD COLUMN ev_ai_summary INTEGER NOT NULL DEFAULT 0').run()
+  console.log('✓ departments.ev_ai_summary column added')
+}
+
 migrateDepartmentsTableV2()
 migrateWebhookLogsV2()
+migrateDepartmentsAiSummary()
 
